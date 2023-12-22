@@ -1,18 +1,17 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
-	"log"
-	"net/http"
-	"sync"
-	"strconv"
+    "database/sql"
+    "encoding/json"
+    "log"
+    "net/http"
+    "sync"
+    "strconv"
 
-	_ "github.com/lib/pq"
-	"github.com/gorilla/mux"
-	"github.com/swaggo/http-swagger"
+    _ "github.com/lib/pq"
+    "github.com/gorilla/mux"
 
-	_ "github.com/Atabek786/koznek/docs"
+    "github.com/swaggo/http-swagger"
 )
 
 type Task struct {
@@ -27,7 +26,7 @@ var dbMutex sync.Mutex
 
 func main() {
 	var err error
-	connStr := "user=postgres dbname=koznek password=20050608 sslmode=disable"
+	connStr := "user=postgres dbname=koznek password=mypassword sslmode=disable"
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal("Error connecting to the database:", err)
@@ -49,11 +48,12 @@ func main() {
 		}
 	})
 
-	http.Handle("/swagger/", httpSwagger.Handler(
-		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
-	))
-
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	router := mux.NewRouter()
+    router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+        httpSwagger.URL("http://localhost:8080/docs/swagger.json"), // URL of the Swagger JSON file
+    ))
+    router.PathPrefix("/docs/").Handler(http.StripPrefix("/docs/", http.FileServer(http.Dir("./docs"))))
+    http.ListenAndServe(":8080", router)
 }
 
 // @Summary Get all tasks
@@ -106,7 +106,7 @@ func handleGetTasks(w http.ResponseWriter, r *http.Request) {
 // @Produce  json
 // @Param id path int true "Task ID"
 // @Success 201 {object} Task
-// @Router /task [post]
+// @Router /task/ [post]
 func handlePostTask(w http.ResponseWriter, r *http.Request) {
     var newTask Task
     err := json.NewDecoder(r.Body).Decode(&newTask)
@@ -116,32 +116,34 @@ func handlePostTask(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    if newTask.Title == "" || newTask.Description == "" {
-        http.Error(w, "Title and Description are required fields", http.StatusBadRequest)
+    if newTask.Title == "" || newTask.Description == "" || newTask.Status == "" {
+        http.Error(w, "Title, Description, and Status are required fields", http.StatusBadRequest)
         return
     }
 
-    dbMutex.Lock()
-    defer dbMutex.Unlock()
+    go func() {
+        dbMutex.Lock()
+        defer dbMutex.Unlock()
 
-    result, err := db.Exec("INSERT INTO task (id, title, description, status) VALUES ($1, $2, $3)", newTask.ID, newTask.Title, newTask.Description, newTask.Status)
-    if err != nil {
-        log.Println("Error inserting new task:", err)
-        http.Error(w, "Failed to create task", http.StatusInternalServerError)
-        return
-    }
+        result, err := db.Exec("INSERT INTO task (id, title, description, status) VALUES ($1, $2, $3, $4)", newTask.ID, newTask.Title, newTask.Description, newTask.Status)
+        if err != nil {
+            log.Println("Error inserting new task:", err)
+            return
+        }
 
-    rowsAffected, err := result.RowsAffected()
-    if err != nil {
-        log.Println("Error getting rows affected:", err)
-        http.Error(w, "Failed to create task", http.StatusInternalServerError)
-        return
-    }
+        rowsAffected, err := result.RowsAffected()
+        if err != nil {
+            log.Println("Error getting rows affected:", err)
+            return
+        }
 
-    if rowsAffected == 0 {
-        http.Error(w, "Failed to create task", http.StatusInternalServerError)
-        return
-    }
+        if rowsAffected == 0 {
+            log.Println("Failed to create task")
+            return
+        }
+
+        log.Println("Task created successfully")
+    }()
 
     w.WriteHeader(http.StatusCreated)
 }
