@@ -1,0 +1,90 @@
+definitions:
+  main.Task:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      status:
+        type: string
+      title:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /task:
+    get:
+      consumes:
+      - application/json
+      description: Get all tasks
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Task'
+            type: array
+      summary: Get all tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Create a new task
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Task'
+      summary: Create a new task
+      tags:
+      - tasks
+  /task/{id}:
+    delete:
+      description: Delete a task by ID
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      summary: Delete a task
+      tags:
+      - tasks
+    put:
+      consumes:
+      - application/json
+      description: Update on existing task
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Task'
+      summary: Update on existing task
+      tags:
+      - tasks
+swagger: "2.0"
